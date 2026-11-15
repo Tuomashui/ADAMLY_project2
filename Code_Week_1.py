@@ -10,6 +10,8 @@
 
 import re
 import html
+import unicodedata
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,6 +40,19 @@ from sklearn.metrics import (
     roc_auc_score,
     RocCurveDisplay
 )
+
+
+FIGURE_DIR = Path(__file__).resolve().parent / "figs"
+FIGURE_DIR.mkdir(exist_ok=True)
+SENTIMENTS = {0: "Negative", 1: "Positive"}
+SENTIMENT_COLORS = {"Negative": "#c44e52", "Positive": "#4c72b0"}
+WORD_PATTERN = re.compile(r"[^\W_]+(?:['-][^\W_]+)*")
+WORD_CONNECTORS = str.maketrans("\u2019\u2010\u2011", "'--")
+
+
+def tokenize(text):
+    """Return words and numbers, keeping internal apostrophes and hyphens."""
+    return WORD_PATTERN.findall(text.translate(WORD_CONNECTORS))
 
 
 # 2. LOAD DATASET
@@ -85,7 +100,7 @@ sns.countplot(
 plt.xticks([0, 1], ["Negative", "Positive"])
 plt.xlabel("Sentiment")
 plt.ylabel("Number of reviews")
-plt.title("Distribution of sentiment classes")
+plt.title("Sentiment classes in the training split")
 
 plt.tight_layout()
 plt.show()
@@ -99,22 +114,19 @@ def clean_text(text):
     # Decode HTML entities
     text = html.unescape(text)
 
-    # Replace HTML line breaks with spaces
-    text = re.sub(r"<br\s*/?>", " ", text, flags=re.IGNORECASE)
-
-    # Remove remaining HTML tags
-    text = re.sub(r"<[^>]+>", " ", text)
+    # Replace HTML tags with spaces without removing comparisons such as 2 < 3.
+    text = re.sub(r"</?[a-zA-Z][\w:-]*(?=[\s/>])[^<>]*>", " ", text)
 
     # Convert text to lowercase
     text = text.lower()
 
     # Remove URLs
-    text = re.sub(r"http\S+|www\.\S+", "", text)
+    text = re.sub(r"\b(?:https?://|www\.)[^\s<>]+", " ", text)
 
     # Remove unnecessary whitespace
     text = re.sub(r"\s+", " ", text).strip()
 
-    return text
+    return unicodedata.normalize("NFC", text)
 
 
 # Apply cleaning to all datasets
@@ -133,64 +145,61 @@ print(train_df["clean_text"].iloc[0])
 # 5. REVIEW LENGTH ANALYSIS
 # ============================================================
 
-# Calculate review lengths using cleaned text
+# Character counts include punctuation, with whitespace normalized to single spaces.
 train_df["char_length"] = train_df["clean_text"].str.len()
+train_df["char_length_no_spaces"] = train_df["clean_text"].str.replace(
+    " ", "", regex=False
+).str.len()
+train_df["tokens"] = train_df["clean_text"].map(tokenize)
+train_df["word_length"] = train_df["tokens"].map(len)
+train_df["sentiment"] = train_df["label"].map(SENTIMENTS)
 
-train_df["word_length"] = train_df["clean_text"].apply(
-    lambda x: len(x.split())
-)
+length_labels = {
+    "word_length": "Words",
+    "char_length": "Characters (with spaces)",
+    "char_length_no_spaces": "Characters (without spaces)",
+}
+print("\nCleaned training review lengths (per review):")
+print(train_df[list(length_labels)].rename(columns=length_labels).describe().round(2).to_string())
 
-print("\nReview length statistics:")
-print(train_df[["char_length", "word_length"]].describe())
-
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-# Word count distribution
-sns.histplot(
-    data=train_df,
-    x="word_length",
-    hue="label",
-    bins=50,
-    ax=axes[0],
-    element="step"
-)
-
-axes[0].set_title("Distribution of review word counts")
-axes[0].set_xlabel("Number of words")
-
-# Review length by sentiment
-sns.boxplot(
-    data=train_df,
-    x="label",
-    y="word_length",
-    ax=axes[1]
-)
-
-axes[1].set_xticks([0, 1], ["Negative", "Positive"])
-axes[1].set_title("Review length by sentiment")
-axes[1].set_xlabel("Sentiment")
-axes[1].set_ylabel("Number of words")
-
-plt.tight_layout()
+fig, axes = plt.subplots(2, 2, figsize=(13, 8), layout="constrained")
+for column, metric in enumerate(("word_length", "char_length")):
+    label = length_labels[metric]
+    sns.histplot(
+        data=train_df, x=metric, hue="sentiment", hue_order=list(SENTIMENT_COLORS),
+        palette=SENTIMENT_COLORS, bins=50, element="step", fill=False,
+        ax=axes[0, column],
+    )
+    axes[0, column].set(xlabel=label, ylabel="Number of reviews")
+    sns.boxplot(
+        data=train_df, x="sentiment", y=metric, order=list(SENTIMENT_COLORS),
+        ax=axes[1, column],
+    )
+    axes[1, column].set(xlabel="Sentiment", ylabel=label)
+fig.suptitle("Cleaned IMDb training review lengths")
+fig.savefig(FIGURE_DIR / "word_distribution.png", dpi=160)
 plt.show()
 
 
 # 6. TOKENIZATION
 # ============================================================
 
-# Example whitespace tokenization
-example = train_df["clean_text"].iloc[0]
-
-tokens = example.split()
-
-print("\nExample tokens:")
-print(tokens[:30])
+example = train_df.iloc[0]
+print(
+    f"\nExample review length: {example['word_length']} words, "
+    f"{example['char_length']} characters with spaces, "
+    f"{example['char_length_no_spaces']} without spaces."
+)
+print("First 30 example tokens:", example["tokens"][:30])
 
 
 # 7. TF-IDF VECTORIZATION
 # ============================================================
 
 tfidf = TfidfVectorizer(
+    tokenizer=tokenize,
+    token_pattern=None,
+    lowercase=False,
     max_features=20000,
     ngram_range=(1, 2),
     min_df=2,
@@ -221,100 +230,38 @@ print("\nNumber of features:", len(tfidf.get_feature_names_out()))
 # 8. WORD CLOUD VISUALIZATION
 # ============================================================
 
-# Combine positive and negative reviews separately
-positive_text = " ".join(
-    train_df[train_df["label"] == 1]["clean_text"]
-)
+# Use the same token counts for word clouds and frequency bars.
+stopwords = set(ENGLISH_STOP_WORDS) - {"no", "not", "nor", "never"}
+sentiment_counts = {}
+for sentiment, reviews in train_df.groupby("sentiment"):
+    sentiment_counts[sentiment] = Counter(
+        word for tokens in reviews["tokens"] for word in tokens if word not in stopwords
+    )
 
-negative_text = " ".join(
-    train_df[train_df["label"] == 0]["clean_text"]
-)
-
-# English stopwords, preserving negation words
-stopwords = set(ENGLISH_STOP_WORDS) - {
-    "no", "not", "nor", "never"
-}
-
-# Generate word clouds
-positive_wc = WordCloud(
-    width=1000,
-    height=500,
-    background_color="white",
-    max_words=100,
-    stopwords=stopwords,
-    collocations=False
-).generate(positive_text)
-
-negative_wc = WordCloud(
-    width=1000,
-    height=500,
-    background_color="white",
-    max_words=100,
-    stopwords=stopwords,
-    collocations=False
-).generate(negative_text)
-
-# Display word clouds
-fig, axes = plt.subplots(1, 2, figsize=(16, 7))
-
-axes[0].imshow(positive_wc, interpolation="bilinear")
-axes[0].set_title("Positive Reviews")
-axes[0].axis("off")
-
-axes[1].imshow(negative_wc, interpolation="bilinear")
-axes[1].set_title("Negative Reviews")
-axes[1].axis("off")
-
-plt.tight_layout()
+fig, axes = plt.subplots(1, 2, figsize=(14, 5), layout="constrained")
+for ax, sentiment in zip(axes, SENTIMENT_COLORS):
+    cloud = WordCloud(
+        width=1000, height=500, background_color="white",
+        max_words=100, random_state=42,
+    ).generate_from_frequencies(sentiment_counts[sentiment])
+    ax.imshow(cloud, interpolation="bilinear")
+    ax.set_title(sentiment)
+    ax.axis("off")
+fig.suptitle("Words in IMDb training reviews (excluding common stopwords)")
 plt.show()
 
 
 # 9. MOST FREQUENT WORDS
 # ============================================================
 
-def plot_common_words(text, title, n=20):
-
-    # Extract words and remove punctuation
-    words = re.findall(r"\b[a-zA-Z]+\b", text.lower())
-
-    # Remove common English stopwords
-    words = [
-        word for word in words
-        if word not in stopwords
-    ]
-
-    word_counts = Counter(words).most_common(n)
-
-    if not word_counts:
-        print("No words available for:", title)
-        return
-
-    words, counts = zip(*word_counts)
-
-    plt.figure(figsize=(10, 6))
-
-    sns.barplot(
-        x=list(counts),
-        y=list(words)
-    )
-
-    plt.title(title)
-    plt.xlabel("Frequency")
-    plt.ylabel("Word")
-
-    plt.tight_layout()
-    plt.show()
-
-
-plot_common_words(
-    positive_text,
-    "Most common words in positive reviews"
-)
-
-plot_common_words(
-    negative_text,
-    "Most common words in negative reviews"
-)
+fig, axes = plt.subplots(1, 2, figsize=(13, 7), sharex=True, layout="constrained")
+for ax, (sentiment, color) in zip(axes, SENTIMENT_COLORS.items()):
+    words, counts = zip(*sentiment_counts[sentiment].most_common(20))
+    ax.barh(words, counts, color=color)
+    ax.invert_yaxis()
+    ax.set(title=sentiment, xlabel="Word occurrences")
+fig.suptitle("Most frequent words in IMDb training reviews (excluding common stopwords)")
+plt.show()
 
 
 # 10. DIMENSIONALITY REDUCTION VISUALIZATION
@@ -334,25 +281,22 @@ explained_variance = svd.explained_variance_ratio_.sum()
 print("\nSVD explained variance:")
 print(f"Two components: {explained_variance:.4f}")
 
-# Visualize reviews in two dimensions
-plt.figure(figsize=(10, 7))
-
-scatter = plt.scatter(
-    X_2d[:, 0],
-    X_2d[:, 1],
-    c=y_train,
-    cmap="coolwarm",
-    alpha=0.4,
-    s=10
+# Plot discrete sentiment classes on the training projection.
+fig, ax = plt.subplots(figsize=(10, 7), layout="constrained")
+for label, sentiment in SENTIMENTS.items():
+    selected = y_train.to_numpy() == label
+    ax.scatter(
+        X_2d[selected, 0], X_2d[selected, 1],
+        color=SENTIMENT_COLORS[sentiment], label=sentiment,
+        alpha=0.3, s=10, linewidths=0,
+    )
+ax.set(
+    xlabel="Component 1",
+    ylabel="Component 2",
+    title=f"Training review TF-IDF projection ({explained_variance:.1%} variance explained)",
 )
-
-plt.xlabel("Component 1")
-plt.ylabel("Component 2")
-plt.title("IMDb Reviews - TF-IDF dimensionality reduction")
-
-plt.colorbar(scatter, label="Sentiment")
-
-plt.tight_layout()
+ax.legend(title="Sentiment")
+fig.savefig(FIGURE_DIR / "TF_IDF.png", dpi=160)
 plt.show()
 
 
@@ -484,7 +428,7 @@ disp.plot(
     ax=ax
 )
 
-plt.title("Logistic Regression - Confusion Matrix")
+plt.title("Validation confusion matrix")
 plt.tight_layout()
 plt.show()
 
@@ -506,7 +450,7 @@ plt.plot(
     label="Random classifier"
 )
 
-plt.title("Logistic Regression - ROC Curve")
+plt.title("Validation ROC curve")
 plt.legend()
 plt.tight_layout()
 plt.show()
@@ -520,7 +464,7 @@ feature_names = np.array(tfidf.get_feature_names_out())
 coefficients = model.coef_[0]
 
 # Identify 20 most positive and negative coefficients
-positive_indices = np.argsort(coefficients)[-20:]
+positive_indices = np.argsort(coefficients)[-20:][::-1]
 negative_indices = np.argsort(coefficients)[:20]
 
 positive_words = feature_names[positive_indices]
