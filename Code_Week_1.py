@@ -22,6 +22,18 @@ from datasets import load_dataset
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    classification_report,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    roc_auc_score,
+    RocCurveDisplay
+)
 
 
 # 2. LOAD DATASET
@@ -348,3 +360,198 @@ print("\nTest:")
 print(y_test.value_counts())
 
 print("\nAll preprocessing steps completed successfully!")
+
+
+
+# ============================================================
+# IMDb SENTIMENT CLASSIFICATION
+# Week 3: Baseline Logistic Regression
+# ============================================================
+
+
+# 1. INITIALIZE LOGISTIC REGRESSION MODEL
+# ============================================================
+
+model = LogisticRegression(
+    C=1.0,
+    max_iter=1000,
+    solver="liblinear",
+    random_state=42
+)
+
+
+# 2. TRAIN THE MODEL
+# ============================================================
+
+print("Training logistic regression model...")
+
+model.fit(X_train, y_train)
+
+print("Training completed!")
+
+
+# 3. MAKE PREDICTIONS ON VALIDATION DATA
+# ============================================================
+
+# Predict sentiment classes
+y_pred = model.predict(X_val)
+
+# Predict positive class probabilities
+y_prob = model.predict_proba(X_val)[:, 1]
+
+
+# 4. CALCULATE CLASSIFICATION METRICS
+# ============================================================
+
+accuracy = accuracy_score(y_val, y_pred)
+precision = precision_score(y_val, y_pred)
+recall = recall_score(y_val, y_pred)
+f1 = f1_score(y_val, y_pred)
+roc_auc = roc_auc_score(y_val, y_prob)
+
+print("\n========================================")
+print("LOGISTIC REGRESSION - VALIDATION RESULTS")
+print("========================================")
+
+print(f"Accuracy:  {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall:    {recall:.4f}")
+print(f"F1-score:  {f1:.4f}")
+print(f"ROC-AUC:   {roc_auc:.4f}")
+
+
+# 5. CLASSIFICATION REPORT
+# ============================================================
+
+print("\nClassification Report:")
+
+print(
+    classification_report(
+        y_val,
+        y_pred,
+        target_names=["Negative", "Positive"],
+        digits=4
+    )
+)
+
+
+# 6. CONFUSION MATRIX
+# ============================================================
+
+cm = confusion_matrix(y_val, y_pred)
+
+print("\nConfusion Matrix:")
+print(cm)
+
+disp = ConfusionMatrixDisplay(
+    confusion_matrix=cm,
+    display_labels=["Negative", "Positive"]
+)
+
+fig, ax = plt.subplots(figsize=(7, 6))
+
+disp.plot(
+    cmap="Blues",
+    values_format="d",
+    ax=ax
+)
+
+plt.title("Logistic Regression - Confusion Matrix")
+plt.tight_layout()
+plt.show()
+
+
+# 7. ROC CURVE
+# ============================================================
+
+RocCurveDisplay.from_predictions(
+    y_val,
+    y_prob,
+    name="Logistic Regression"
+)
+
+plt.plot(
+    [0, 1],
+    [0, 1],
+    linestyle="--",
+    color="gray",
+    label="Random classifier"
+)
+
+plt.title("Logistic Regression - ROC Curve")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+# 8. MOST IMPORTANT WORDS
+# ============================================================
+
+# Extract TF-IDF feature names and model coefficients
+feature_names = np.array(tfidf.get_feature_names_out())
+coefficients = model.coef_[0]
+
+# Identify 20 most positive and negative coefficients
+positive_indices = np.argsort(coefficients)[-20:]
+negative_indices = np.argsort(coefficients)[:20]
+
+positive_words = feature_names[positive_indices]
+positive_values = coefficients[positive_indices]
+
+negative_words = feature_names[negative_indices]
+negative_values = coefficients[negative_indices]
+
+# Visualize influential features
+fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+
+sns.barplot(
+    x=positive_values,
+    y=positive_words,
+    ax=axes[0]
+)
+
+axes[0].set_title("Features associated with positive sentiment")
+axes[0].set_xlabel("Logistic regression coefficient")
+axes[0].set_ylabel("Feature")
+
+sns.barplot(
+    x=negative_values,
+    y=negative_words,
+    ax=axes[1]
+)
+
+axes[1].set_title("Features associated with negative sentiment")
+axes[1].set_xlabel("Logistic regression coefficient")
+axes[1].set_ylabel("Feature")
+
+plt.tight_layout()
+plt.show()
+
+
+# 9. FINAL RESULTS SUMMARY
+# ============================================================
+
+results = pd.DataFrame({
+    "Metric": [
+        "Accuracy",
+        "Precision",
+        "Recall",
+        "F1-score",
+        "ROC-AUC"
+    ],
+    "Validation Score": [
+        accuracy,
+        precision,
+        recall,
+        f1,
+        roc_auc
+    ]
+})
+
+print("\n========================================")
+print("FINAL VALIDATION RESULTS")
+print("========================================")
+
+print(results.to_string(index=False))
+
+print("\nBaseline logistic regression completed!")
