@@ -1,8 +1,9 @@
 
 # ============================================================
 # IMDb SENTIMENT CLASSIFICATION
-# Week 3: Text preprocessing and visualization
+# Week 3: Text preprocessing, visualization and baseline model
 # ============================================================
+
 
 # 1. IMPORT LIBRARIES
 # ============================================================
@@ -20,7 +21,10 @@ from wordcloud import WordCloud
 from datasets import load_dataset
 
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import (
+    TfidfVectorizer,
+    ENGLISH_STOP_WORDS
+)
 from sklearn.decomposition import TruncatedSVD
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -46,7 +50,6 @@ train_df = dataset["train"].to_pandas()
 test_df = dataset["test"].to_pandas()
 
 print("Dataset loaded successfully!")
-print(dataset)
 
 # Split original training data into training and validation sets
 train_df, val_df = train_test_split(
@@ -83,45 +86,6 @@ plt.xticks([0, 1], ["Negative", "Positive"])
 plt.xlabel("Sentiment")
 plt.ylabel("Number of reviews")
 plt.title("Distribution of sentiment classes")
-
-plt.tight_layout()
-plt.show()
-
-
-# 3.2 Review length distribution
-
-train_df["char_length"] = train_df["text"].apply(len)
-
-train_df["word_length"] = train_df["text"].apply(
-    lambda x: len(x.split())
-)
-
-print("\nReview length statistics:")
-print(train_df[["char_length", "word_length"]].describe())
-
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-sns.histplot(
-    data=train_df,
-    x="word_length",
-    hue="label",
-    bins=50,
-    ax=axes[0],
-    element="step"
-)
-
-axes[0].set_title("Distribution of review word counts")
-axes[0].set_xlabel("Number of words")
-
-sns.boxplot(
-    data=train_df,
-    x="label",
-    y="word_length",
-    ax=axes[1]
-)
-
-axes[1].set_xticks([0, 1], ["Negative", "Positive"])
-axes[1].set_title("Review length by sentiment")
 
 plt.tight_layout()
 plt.show()
@@ -166,7 +130,52 @@ print("\nCleaned review:")
 print(train_df["clean_text"].iloc[0])
 
 
-# 5. TOKENIZATION
+# 5. REVIEW LENGTH ANALYSIS
+# ============================================================
+
+# Calculate review lengths using cleaned text
+train_df["char_length"] = train_df["clean_text"].str.len()
+
+train_df["word_length"] = train_df["clean_text"].apply(
+    lambda x: len(x.split())
+)
+
+print("\nReview length statistics:")
+print(train_df[["char_length", "word_length"]].describe())
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Word count distribution
+sns.histplot(
+    data=train_df,
+    x="word_length",
+    hue="label",
+    bins=50,
+    ax=axes[0],
+    element="step"
+)
+
+axes[0].set_title("Distribution of review word counts")
+axes[0].set_xlabel("Number of words")
+
+# Review length by sentiment
+sns.boxplot(
+    data=train_df,
+    x="label",
+    y="word_length",
+    ax=axes[1]
+)
+
+axes[1].set_xticks([0, 1], ["Negative", "Positive"])
+axes[1].set_title("Review length by sentiment")
+axes[1].set_xlabel("Sentiment")
+axes[1].set_ylabel("Number of words")
+
+plt.tight_layout()
+plt.show()
+
+
+# 6. TOKENIZATION
 # ============================================================
 
 # Example whitespace tokenization
@@ -178,7 +187,7 @@ print("\nExample tokens:")
 print(tokens[:30])
 
 
-# 6. TF-IDF VECTORIZATION
+# 7. TF-IDF VECTORIZATION
 # ============================================================
 
 tfidf = TfidfVectorizer(
@@ -208,11 +217,8 @@ print("Test matrix:", X_test.shape)
 
 print("\nNumber of features:", len(tfidf.get_feature_names_out()))
 
-print("\nFirst 30 vocabulary features:")
-print(tfidf.get_feature_names_out()[:30])
 
-
-# 7. WORD CLOUD VISUALIZATION
+# 8. WORD CLOUD VISUALIZATION
 # ============================================================
 
 # Combine positive and negative reviews separately
@@ -224,19 +230,28 @@ negative_text = " ".join(
     train_df[train_df["label"] == 0]["clean_text"]
 )
 
+# English stopwords, preserving negation words
+stopwords = set(ENGLISH_STOP_WORDS) - {
+    "no", "not", "nor", "never"
+}
+
 # Generate word clouds
 positive_wc = WordCloud(
     width=1000,
     height=500,
     background_color="white",
-    max_words=100
+    max_words=100,
+    stopwords=stopwords,
+    collocations=False
 ).generate(positive_text)
 
 negative_wc = WordCloud(
     width=1000,
     height=500,
     background_color="white",
-    max_words=100
+    max_words=100,
+    stopwords=stopwords,
+    collocations=False
 ).generate(negative_text)
 
 # Display word clouds
@@ -254,22 +269,25 @@ plt.tight_layout()
 plt.show()
 
 
-# 8. MOST FREQUENT WORDS
+# 9. MOST FREQUENT WORDS
 # ============================================================
-
-# Remove common English stopwords for visualization only
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-
-stopwords = set(ENGLISH_STOP_WORDS)
 
 def plot_common_words(text, title, n=20):
 
+    # Extract words and remove punctuation
+    words = re.findall(r"\b[a-zA-Z]+\b", text.lower())
+
+    # Remove common English stopwords
     words = [
-        word for word in text.split()
+        word for word in words
         if word not in stopwords
     ]
 
     word_counts = Counter(words).most_common(n)
+
+    if not word_counts:
+        print("No words available for:", title)
+        return
 
     words, counts = zip(*word_counts)
 
@@ -299,7 +317,7 @@ plot_common_words(
 )
 
 
-# 9. DIMENSIONALITY REDUCTION VISUALIZATION
+# 10. DIMENSIONALITY REDUCTION VISUALIZATION
 # ============================================================
 
 # Reduce TF-IDF features to two dimensions using SVD
@@ -309,6 +327,12 @@ svd = TruncatedSVD(
 )
 
 X_2d = svd.fit_transform(X_train)
+
+# Print explained variance
+explained_variance = svd.explained_variance_ratio_.sum()
+
+print("\nSVD explained variance:")
+print(f"Two components: {explained_variance:.4f}")
 
 # Visualize reviews in two dimensions
 plt.figure(figsize=(10, 7))
@@ -332,7 +356,7 @@ plt.tight_layout()
 plt.show()
 
 
-# 10. FINAL DATASET INFORMATION
+# 11. FINAL DATASET INFORMATION
 # ============================================================
 
 print("\n========================================")
@@ -362,14 +386,12 @@ print(y_test.value_counts())
 print("\nAll preprocessing steps completed successfully!")
 
 
-
 # ============================================================
-# IMDb SENTIMENT CLASSIFICATION
-# Week 3: Baseline Logistic Regression
+# WEEK 3: BASELINE LOGISTIC REGRESSION
 # ============================================================
 
 
-# 1. INITIALIZE LOGISTIC REGRESSION MODEL
+# 12. INITIALIZE LOGISTIC REGRESSION MODEL
 # ============================================================
 
 model = LogisticRegression(
@@ -380,17 +402,17 @@ model = LogisticRegression(
 )
 
 
-# 2. TRAIN THE MODEL
+# 13. TRAIN THE MODEL
 # ============================================================
 
-print("Training logistic regression model...")
+print("\nTraining logistic regression model...")
 
 model.fit(X_train, y_train)
 
 print("Training completed!")
 
 
-# 3. MAKE PREDICTIONS ON VALIDATION DATA
+# 14. MAKE PREDICTIONS ON VALIDATION DATA
 # ============================================================
 
 # Predict sentiment classes
@@ -400,13 +422,13 @@ y_pred = model.predict(X_val)
 y_prob = model.predict_proba(X_val)[:, 1]
 
 
-# 4. CALCULATE CLASSIFICATION METRICS
+# 15. CALCULATE CLASSIFICATION METRICS
 # ============================================================
 
 accuracy = accuracy_score(y_val, y_pred)
-precision = precision_score(y_val, y_pred)
-recall = recall_score(y_val, y_pred)
-f1 = f1_score(y_val, y_pred)
+precision = precision_score(y_val, y_pred, zero_division=0)
+recall = recall_score(y_val, y_pred, zero_division=0)
+f1 = f1_score(y_val, y_pred, zero_division=0)
 roc_auc = roc_auc_score(y_val, y_prob)
 
 print("\n========================================")
@@ -420,7 +442,7 @@ print(f"F1-score:  {f1:.4f}")
 print(f"ROC-AUC:   {roc_auc:.4f}")
 
 
-# 5. CLASSIFICATION REPORT
+# 16. CLASSIFICATION REPORT
 # ============================================================
 
 print("\nClassification Report:")
@@ -429,16 +451,22 @@ print(
     classification_report(
         y_val,
         y_pred,
+        labels=[0, 1],
         target_names=["Negative", "Positive"],
-        digits=4
+        digits=4,
+        zero_division=0
     )
 )
 
 
-# 6. CONFUSION MATRIX
+# 17. CONFUSION MATRIX
 # ============================================================
 
-cm = confusion_matrix(y_val, y_pred)
+cm = confusion_matrix(
+    y_val,
+    y_pred,
+    labels=[0, 1]
+)
 
 print("\nConfusion Matrix:")
 print(cm)
@@ -461,7 +489,7 @@ plt.tight_layout()
 plt.show()
 
 
-# 7. ROC CURVE
+# 18. ROC CURVE
 # ============================================================
 
 RocCurveDisplay.from_predictions(
@@ -484,7 +512,7 @@ plt.tight_layout()
 plt.show()
 
 
-# 8. MOST IMPORTANT WORDS
+# 19. MOST INFLUENTIAL TF-IDF FEATURES
 # ============================================================
 
 # Extract TF-IDF feature names and model coefficients
@@ -528,7 +556,7 @@ plt.tight_layout()
 plt.show()
 
 
-# 9. FINAL RESULTS SUMMARY
+# 20. FINAL RESULTS SUMMARY
 # ============================================================
 
 results = pd.DataFrame({
