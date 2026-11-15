@@ -9,3 +9,5 @@ for i in range(5):
     print("Review:", dataset["train"][i]["text"])
     print("Sentiment:", dataset["train"][i]["label"])
     print("-" * 80)
+
+pippeli :3
