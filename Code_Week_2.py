@@ -709,22 +709,30 @@ train_dataset = prepare_dataset(train_df)
 val_dataset = prepare_dataset(val_df)
 test_dataset = prepare_dataset(test_df)
 
+PIN_MEMORY = device.type == "cuda"
+
 train_loader = DataLoader(
     train_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=True
+    shuffle=True,
+    pin_memory=PIN_MEMORY,
+    num_workers=0
 )
 
 val_loader = DataLoader(
     val_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=False
+    shuffle=False,
+    pin_memory=PIN_MEMORY,
+    num_workers=0
 )
 
 test_loader = DataLoader(
     test_dataset,
     batch_size=BATCH_SIZE,
-    shuffle=False
+    shuffle=False,
+    pin_memory=PIN_MEMORY,
+    num_workers=0
 )
 
 print("Training batches:", len(train_loader))
