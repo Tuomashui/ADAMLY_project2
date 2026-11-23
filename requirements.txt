@@ -1,0 +1,12 @@
+datasets==4.4.1
+transformers==4.57.6
+torch==2.15.0
+numpy>=1.26
+pandas>=2.2
+scikit-learn>=1.5
+matplotlib>=3.9
+seaborn>=0.13
+wordcloud>=1.9
+joblib>=1.4
+filelock>=3.16
+threadpoolctl>=3.5

@@ -1,0 +1,28 @@
+{
+  "dataset": "banking77",
+  "model": "transfer_upper",
+  "scores": {
+    "validation": {
+      "accuracy": 0.7226386806596702,
+      "macro_f1": 0.6868119352126716
+    },
+    "test": {
+      "accuracy": 0.699025974025974,
+      "macro_f1": 0.6854741232949475
+    }
+  },
+  "trainable_weights": 208205,
+  "total_weights": 4395853,
+  "training_seconds": 51.77457409998169,
+  "best_epoch": 5,
+  "epochs_completed": 5,
+  "learning_rate": 0.0005,
+  "checkpoint": "prajjwal1/bert-tiny",
+  "encoder_blocks": 2,
+  "checkpoint_revision": "6f75de8b60a9f8a2fdf7b69cbd86d9e64bcb3837",
+  "truncated_fraction": {
+    "train": 0.0,
+    "validation": 0.0,
+    "test": 0.0
+  }
+}

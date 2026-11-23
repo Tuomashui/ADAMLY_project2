@@ -1,0 +1,15 @@
+.venv*/
+.cache/
+__pycache__/
+*.py[cod]
+*.pt
+*.pth
+*.joblib
+output/week5/**/tokenizer/
+output/week5/**/*_predictions.csv
+tmp/
+*.aux
+*.log
+*.out
+output/week5/**/.run.lock
+output/week5/smoke/

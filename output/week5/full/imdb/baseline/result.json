@@ -1,0 +1,20 @@
+{
+  "dataset": "imdb",
+  "model": "baseline",
+  "scores": {
+    "validation": {
+      "accuracy": 0.9018,
+      "macro_f1": 0.9017982677214427,
+      "roc_auc": 0.9653777600000001
+    },
+    "test": {
+      "accuracy": 0.89884,
+      "macro_f1": 0.8988338450511328,
+      "roc_auc": 0.9623177152
+    }
+  },
+  "trainable_weights": 20001,
+  "training_seconds": 46.03617859998485,
+  "features": 20000,
+  "solver": "liblinear"
+}
