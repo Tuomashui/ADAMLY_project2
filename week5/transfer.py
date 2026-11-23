@@ -1,13 +1,24 @@
 """Controlled BERT head, upper block, lower block, and full fine-tuning."""
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from pathlib import Path
+from huggingface_hub import try_to_load_from_cache
+from transformers import BertForSequenceClassification, BertTokenizer
 import torch
 from torch.utils.data import TensorDataset
 
 MODES = ("head", "upper", "lower", "full")
 
 
+def checkpoint_revision(checkpoint):
+    """Read the resolved Hub revision without relying on private model attributes."""
+    if Path(checkpoint).is_dir():
+        return None
+    config_path = try_to_load_from_cache(checkpoint, "config.json")
+    return Path(config_path).parent.name if isinstance(config_path, str) else None
+
+
 def encode_pretrained(frames, checkpoint, max_length):
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+    # Older BERT checkpoints may provide vocab.txt without tokenizer metadata.
+    tokenizer = BertTokenizer.from_pretrained(checkpoint)
     datasets = {}
     truncation = {}
     for split, frame in frames.items():
@@ -25,12 +36,11 @@ def encode_pretrained(frames, checkpoint, max_length):
 
 
 def create_model(checkpoint, labels, mode):
-    model = AutoModelForSequenceClassification.from_pretrained(
+    # The original BERT-tiny config predates the model_type metadata field.
+    model = BertForSequenceClassification.from_pretrained(
         checkpoint, num_labels=len(labels), id2label=dict(enumerate(labels)),
         label2id={name: i for i, name in enumerate(labels)},
     )
-    if model.config.model_type != "bert":
-        raise ValueError("Layer selection supports BERT checkpoints, such as prajjwal1/bert-tiny.")
     for parameter in model.parameters():
         parameter.requires_grad = mode == "full"
     for parameter in model.classifier.parameters():

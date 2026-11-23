@@ -18,7 +18,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from collections import Counter
-from wordcloud import WordCloud
+try:
+    from wordcloud import WordCloud
+except ModuleNotFoundError:
+    WordCloud = None
 
 from datasets import load_dataset
 
@@ -238,17 +241,20 @@ for sentiment, reviews in train_df.groupby("sentiment"):
         word for tokens in reviews["tokens"] for word in tokens if word not in stopwords
     )
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5), layout="constrained")
-for ax, sentiment in zip(axes, SENTIMENT_COLORS):
-    cloud = WordCloud(
-        width=1000, height=500, background_color="white",
-        max_words=100, random_state=42,
-    ).generate_from_frequencies(sentiment_counts[sentiment])
-    ax.imshow(cloud, interpolation="bilinear")
-    ax.set_title(sentiment)
-    ax.axis("off")
-fig.suptitle("Words in IMDb training reviews (excluding common stopwords)")
-plt.show()
+if WordCloud is not None:
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5), layout="constrained")
+    for ax, sentiment in zip(axes, SENTIMENT_COLORS):
+        cloud = WordCloud(
+            width=1000, height=500, background_color="white",
+            max_words=100, random_state=42,
+        ).generate_from_frequencies(sentiment_counts[sentiment])
+        ax.imshow(cloud, interpolation="bilinear")
+        ax.set_title(sentiment)
+        ax.axis("off")
+    fig.suptitle("Words in IMDb training reviews (excluding common stopwords)")
+    plt.show()
+else:
+    print("Optional wordcloud package is unavailable. Word-frequency plots are shown below.")
 
 
 # 9. MOST FREQUENT WORDS

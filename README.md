@@ -2,34 +2,57 @@
 
 Run commands from the repository root in PowerShell.
 
-## Environment
+## Install with regular Python
 
-The existing environment is Python 3.13 in `.venv313`.
+The project can run directly with a regular Python installation.
+Install the newest available dependencies into the Python you will use:
 
 ~~~powershell
-.\.venv313\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv313\Scripts\python.exe -m pip check
+$projectPython = "$env:LOCALAPPDATA\Python\pythoncore-3.15-64\python.exe"
+& $projectPython -m pip install --upgrade -r requirements.txt
+& $projectPython -m pip check
 ~~~
 
-To create the environment on a new machine, first run `py -3.13 -m venv .venv313`.
-Activation is optional when invoking the environment's executable directly.
+The example selects your installed Python 3.15 directly. Change
+`$projectPython` to use another Python installation. Requirements have no
+version pins. Install the dependencies into each Python installation you choose.
+
+Compatibility was checked with Python 3.15.2, PyTorch 2.15.0,
+Transformers 5.24.0, and datasets 5.2.0 by completing all eight
+one-epoch smoke experiments on real dataset subsets.
+
+Run the commands below from the repository root. In an editor, select the
+same Python interpreter used to install the dependencies. PowerShell
+activation scripts are unnecessary for these commands.
+
 The first run downloads datasets and pretrained weights from Hugging Face.
 Caches and large model artifacts are excluded from Git.
+
+Week 1 additionally supports optional word clouds through the wordcloud package.
+Install it separately with the following command when a compatible wheel or
+a C++ compiler is available:
+
+~~~powershell
+& $projectPython -m pip install --upgrade wordcloud
+~~~
+
+Without this optional package, Week 1 still produces its word-frequency plots
+and classification results.
 
 ## Run Week 5
 
 ~~~powershell
 # Verify all stages on small real-data subsets (one epoch).
-.\.venv313\Scripts\python.exe Code_Week_2.py --quick
+& $projectPython Code_Week_2.py --quick
 
 # Complete full-data experiments, with transfer learning on BANKING77.
-.\.venv313\Scripts\python.exe Code_Week_2.py
+& $projectPython Code_Week_2.py
 
 # Individual assignment parts, using the same full-run configuration.
-.\.venv313\Scripts\python.exe Code_Week_2.py --part imdb
-.\.venv313\Scripts\python.exe Code_Week_2.py --part banking77
-.\.venv313\Scripts\python.exe Code_Week_2.py --part transfer
-.\.venv313\Scripts\python.exe Code_Week_2.py --part report
+& $projectPython Code_Week_2.py --part imdb
+& $projectPython Code_Week_2.py --part banking77
+& $projectPython Code_Week_2.py --part transfer
+& $projectPython Code_Week_2.py --part report
 ~~~
 
 The default is CPU when CUDA is unavailable. It uses four CPU threads,
@@ -43,7 +66,7 @@ Choose a fresh `--output` directory when changing either option.
 Changed settings require a fresh `--output` directory:
 
 ~~~powershell
-.\.venv313\Scripts\python.exe Code_Week_2.py --epochs 3 --output output/week5/three_epochs
+& $projectPython Code_Week_2.py --epochs 3 --output output/week5/three_epochs
 ~~~
 
 Completed experiments are skipped on an identical rerun. An interrupted
@@ -51,6 +74,26 @@ experiment restarts from its first epoch. Completed result files are
 written after predictions and checkpoint saving. Reusing an output directory
 with changed settings raises an error to avoid mixing incompatible results.
 For source-code changes affecting an experiment, use a fresh output folder.
+
+You can also launch the package directly from the repository root:
+
+~~~powershell
+& $projectPython -m week5.run --quick
+~~~
+
+From inside the week5 folder, direct launching also works:
+
+~~~powershell
+& $projectPython run.py --quick
+~~~
+
+Completed runs retain their recorded environment versions. To measure results
+after upgrading libraries, choose a fresh output directory so the new run
+does not reuse historical models:
+
+~~~powershell
+& $projectPython Code_Week_2.py --output output/week5/latest
+~~~
 
 ## Modules
 

@@ -205,8 +205,11 @@ def generate_report(output, config):
     output.mkdir(parents=True, exist_ok=True)
     (output / "results.tex").write_text("\n\n".join(sections), encoding="utf-8")
     pd.DataFrame(rows).to_csv(output / "summary.csv", index=False)
-    versions = {name: importlib.metadata.version(name)
-                for name in ("torch", "transformers", "datasets", "scikit-learn", "pandas",
-                             "numpy", "matplotlib", "tokenizers", "huggingface-hub")}
-    save_json(output / "environment.json", {"python": platform.python_version(), **versions})
+    environment_path = output / "environment.json"
+    # Keep the recorded training environment when rebuilding a historical report.
+    if not environment_path.exists():
+        versions = {name: importlib.metadata.version(name)
+                    for name in ("torch", "transformers", "datasets", "scikit-learn", "pandas",
+                                 "numpy", "matplotlib", "tokenizers", "huggingface-hub")}
+        save_json(environment_path, {"python": platform.python_version(), **versions})
     print(f"Report tables: {output / 'results.tex'}", flush=True)

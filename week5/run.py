@@ -2,6 +2,13 @@
 import argparse
 import json
 from pathlib import Path
+
+# Support both the repository entry point and running this file directly.
+if not __package__:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "week5"
+
 from .common import ROOT, prepare_data, set_seed, save_json
 import torch
 from filelock import FileLock
@@ -75,7 +82,7 @@ def main():
         from .baseline import run_baseline
         from .transformer import TransformerClassifier, encode_frames
         from .training import train_model
-        from .transfer import MODES, encode_pretrained, create_model
+        from .transfer import MODES, encode_pretrained, create_model, checkpoint_revision
         for name in names:
             print(f"Preparing {name}...", flush=True)
             frames, metadata = prepare_data(name, args.seed, args.quick)
@@ -114,12 +121,16 @@ def main():
                     model.config.save_pretrained(folder)
                     train_model(model, datasets, frames, metadata, folder, config, f"transfer_{mode}",
                                 {"checkpoint": args.checkpoint, "encoder_blocks": model.config.num_hidden_layers,
-                                 "checkpoint_revision": model.config._commit_hash,
+                                 "checkpoint_revision": checkpoint_revision(args.checkpoint),
                                  "truncated_fraction": truncated})
         if args.part == "prepare":
             # Cache checkpoint/tokenizer in advance so training can run offline.
-            from transformers import AutoTokenizer, AutoModel
-            AutoTokenizer.from_pretrained(args.checkpoint)
-            AutoModel.from_pretrained(args.checkpoint)
+            from transformers import BertTokenizer, BertModel
+            BertTokenizer.from_pretrained(args.checkpoint)
+            BertModel.from_pretrained(args.checkpoint)
         from .report import generate_report
         generate_report(output, config)
+
+
+if __name__ == "__main__":
+    main()
