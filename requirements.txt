@@ -1,12 +1,9 @@
 datasets
 transformers
-huggingface-hub
 torch
 numpy
 pandas
 scikit-learn
 matplotlib
 seaborn
-joblib
-filelock
 threadpoolctl

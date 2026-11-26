@@ -14,6 +14,8 @@ import unicodedata
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -45,12 +47,17 @@ from sklearn.metrics import (
 )
 
 
-FIGURE_DIR = Path(__file__).resolve().parent / "figs"
+FIGURE_DIR = Path(__file__).resolve().parent / "figures"
 FIGURE_DIR.mkdir(exist_ok=True)
 SENTIMENTS = {0: "Negative", 1: "Positive"}
 SENTIMENT_COLORS = {"Negative": "#c44e52", "Positive": "#4c72b0"}
 WORD_PATTERN = re.compile(r"[^\W_]+(?:['-][^\W_]+)*")
 WORD_CONNECTORS = str.maketrans("\u2019\u2010\u2011", "'--")
+
+
+def save_figure(name):
+    plt.gcf().savefig(FIGURE_DIR / f"week1_{name}.png", dpi=160, bbox_inches="tight")
+    plt.close()
 
 
 def tokenize(text):
@@ -106,7 +113,7 @@ plt.ylabel("Number of reviews")
 plt.title("Sentiment classes in the training split")
 
 plt.tight_layout()
-plt.show()
+save_figure("class_balance")
 
 
 # 4. TEXT CLEANING
@@ -180,8 +187,7 @@ for column, metric in enumerate(("word_length", "char_length")):
     )
     axes[1, column].set(xlabel="Sentiment", ylabel=label)
 fig.suptitle("Cleaned IMDb training review lengths")
-fig.savefig(FIGURE_DIR / "word_distribution.png", dpi=160)
-plt.show()
+save_figure("review_lengths")
 
 
 # 6. TOKENIZATION
@@ -252,7 +258,7 @@ if WordCloud is not None:
         ax.set_title(sentiment)
         ax.axis("off")
     fig.suptitle("Words in IMDb training reviews (excluding common stopwords)")
-    plt.show()
+    save_figure("word_clouds")
 else:
     print("Optional wordcloud package is unavailable. Word-frequency plots are shown below.")
 
@@ -267,7 +273,7 @@ for ax, (sentiment, color) in zip(axes, SENTIMENT_COLORS.items()):
     ax.invert_yaxis()
     ax.set(title=sentiment, xlabel="Word occurrences")
 fig.suptitle("Most frequent words in IMDb training reviews (excluding common stopwords)")
-plt.show()
+save_figure("word_frequencies")
 
 
 # 10. DIMENSIONALITY REDUCTION VISUALIZATION
@@ -302,8 +308,7 @@ ax.set(
     title=f"Training review TF-IDF projection ({explained_variance:.1%} variance explained)",
 )
 ax.legend(title="Sentiment")
-fig.savefig(FIGURE_DIR / "TF_IDF.png", dpi=160)
-plt.show()
+save_figure("tfidf_projection")
 
 
 # 11. FINAL DATASET INFORMATION
@@ -436,7 +441,7 @@ disp.plot(
 
 plt.title("Validation confusion matrix")
 plt.tight_layout()
-plt.show()
+save_figure("confusion_matrix")
 
 
 # 18. ROC CURVE
@@ -459,7 +464,7 @@ plt.plot(
 plt.title("Validation ROC curve")
 plt.legend()
 plt.tight_layout()
-plt.show()
+save_figure("roc_curve")
 
 
 # 19. MOST INFLUENTIAL TF-IDF FEATURES
@@ -503,7 +508,7 @@ axes[1].set_xlabel("Logistic regression coefficient")
 axes[1].set_ylabel("Feature")
 
 plt.tight_layout()
-plt.show()
+save_figure("influential_features")
 
 
 # 20. FINAL RESULTS SUMMARY
